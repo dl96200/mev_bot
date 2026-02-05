@@ -8,12 +8,14 @@ import (
 	"syscall"
 	"time"
 
+	"mev_bot/internal/chain"
 	"mev_bot/internal/config"
 	"mev_bot/internal/engine"
 	"mev_bot/internal/executor"
 	"mev_bot/internal/marketdata"
 	"mev_bot/internal/monitoring"
 	"mev_bot/internal/risk"
+	"mev_bot/internal/simulator"
 	"mev_bot/internal/strategy"
 	"mev_bot/internal/txbuilder"
 )
@@ -30,11 +32,13 @@ func main() {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
-	md := marketdata.NewService(cfg)
+	rpcClient := chain.NewClient(cfg.RPCURL)
+	md := marketdata.NewService(cfg, rpcClient)
 	builder := txbuilder.NewBuilder(cfg)
-	exec := executor.NewService(cfg, builder)
+	exec := executor.NewService(cfg, builder, rpcClient)
 	riskManager := risk.NewManager(cfg)
 	monitor := monitoring.NewService(cfg)
+	sim := simulator.NewService(cfg, rpcClient)
 
 	strategies := []strategy.Strategy{
 		strategy.NewDexArb(cfg),
@@ -42,7 +46,7 @@ func main() {
 		strategy.NewLiquidation(cfg),
 	}
 
-	bot := engine.NewBot(cfg, md, exec, riskManager, monitor, strategies)
+	bot := engine.NewBot(cfg, md, exec, riskManager, monitor, sim, strategies)
 
 	go func() {
 		<-signalChan

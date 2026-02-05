@@ -24,5 +24,8 @@ func (l *Liquidation) Evaluate(_ context.Context, opportunity marketdata.Opportu
 		return nil, nil
 	}
 
-	return buildPlan(l.cfg, l.Name(), l.cfg.MinProfitUSD+3, "fetch account", "repay debt", "seize collateral"), nil
+	plan := buildPlan(l.cfg, l.Name(), l.cfg.MinProfitUSD+3, "fetch account", "repay debt", "seize collateral")
+	plan.TargetAddress = "0x0000000000000000000000000000000000000000"
+	plan.Calldata = "0x"
+	return plan, nil
 }

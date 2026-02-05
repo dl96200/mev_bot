@@ -17,5 +17,14 @@ func (m *Manager) Approve(plan *strategy.Plan) bool {
 	if plan == nil {
 		return false
 	}
-	return plan.ExpectedPNL >= m.cfg.MinProfitUSD
+	if plan.ExpectedPNL < m.cfg.MinProfitUSD {
+		return false
+	}
+	if plan.SlippageBps > m.cfg.MaxSlippageBps {
+		return false
+	}
+	if plan.GasLimit > 0 && m.cfg.MaxGasUSD > 0 && plan.EstimatedGasUSD > m.cfg.MaxGasUSD {
+		return false
+	}
+	return true
 }

@@ -2,8 +2,9 @@ package txbuilder
 
 import (
 	"fmt"
-	"time"
+	"strconv"
 
+	"mev_bot/internal/chain"
 	"mev_bot/internal/config"
 	"mev_bot/internal/strategy"
 )
@@ -16,9 +17,35 @@ func NewBuilder(cfg config.Config) *Builder {
 	return &Builder{cfg: cfg}
 }
 
-func (b *Builder) Build(plan *strategy.Plan) (string, error) {
+func (b *Builder) Build(plan *strategy.Plan) (*chain.SendTransactionRequest, error) {
 	if plan == nil {
-		return "", fmt.Errorf("nil plan")
+		return nil, fmt.Errorf("nil plan")
 	}
-	return fmt.Sprintf("tx:%s:%d", plan.Strategy, time.Now().Unix()), nil
+	if b.cfg.FromAddress == "" {
+		return nil, fmt.Errorf("missing MEV_FROM_ADDRESS")
+	}
+
+	maxFee := gweiToWei(b.cfg.MaxGasGwei)
+	priorityFee := gweiToWei(plan.PriorityFeeGwei)
+
+	return &chain.SendTransactionRequest{
+		From:                 b.cfg.FromAddress,
+		To:                   plan.TargetAddress,
+		Gas:                  toHex(plan.GasLimit),
+		Value:                toHex(plan.ValueWei),
+		Data:                 plan.Calldata,
+		MaxFeePerGas:         maxFee,
+		MaxPriorityFeePerGas: priorityFee,
+	}, nil
+}
+
+func gweiToWei(gwei int64) string {
+	if gwei <= 0 {
+		return "0x0"
+	}
+	return "0x" + strconv.FormatInt(gwei*1_000_000_000, 16)
+}
+
+func toHex(value int64) string {
+	return "0x" + strconv.FormatInt(value, 16)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"mev_bot/internal/chain"
 	"mev_bot/internal/config"
 )
 
@@ -18,11 +19,14 @@ type Service struct {
 	source Source
 }
 
-func NewService(cfg config.Config) *Service {
+func NewService(cfg config.Config, client *chain.Client) *Service {
 	var source Source
-	if cfg.OpportunityFile != "" {
+	switch cfg.MarketDataSource {
+	case "file":
 		source = NewFileSource(cfg, cfg.OpportunityFile)
-	} else {
+	case "rpc":
+		source = NewRPCSource(cfg, client)
+	default:
 		source = NewTickerSource(cfg)
 	}
 	return &Service{source: source}
