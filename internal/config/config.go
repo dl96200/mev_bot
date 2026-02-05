@@ -10,6 +10,7 @@ type Config struct {
 	MaxGasGwei         int64
 	RiskLimitUSD       float64
 	FlashLoanProviders []string
+	OpportunityFile    string
 }
 
 func LoadFromEnv() Config {
@@ -21,6 +22,7 @@ func LoadFromEnv() Config {
 		MaxGasGwei:         getEnvInt64("MEV_MAX_GAS_GWEI", 120),
 		RiskLimitUSD:       getEnvFloat("MEV_RISK_LIMIT_USD", 5000),
 		FlashLoanProviders: []string{"aave-v3", "uniswap-v3"},
+		OpportunityFile:    getEnv("MEV_OPPORTUNITY_FILE", ""),
 	}
 }
 

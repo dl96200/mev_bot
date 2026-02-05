@@ -15,20 +15,21 @@ type Opportunity struct {
 }
 
 type Service struct {
-	cfg           config.Config
-	opportunities chan Opportunity
+	source Source
 }
 
 func NewService(cfg config.Config) *Service {
-	return &Service{
-		cfg:           cfg,
-		opportunities: make(chan Opportunity, 64),
+	var source Source
+	if cfg.OpportunityFile != "" {
+		source = NewFileSource(cfg, cfg.OpportunityFile)
+	} else {
+		source = NewTickerSource(cfg)
 	}
+	return &Service{source: source}
 }
 
 func (s *Service) Start(ctx context.Context) error {
-	go s.seedTicker(ctx)
-	return nil
+	return s.source.Start(ctx)
 }
 
 func (s *Service) Refresh(ctx context.Context) error {
@@ -41,24 +42,5 @@ func (s *Service) Refresh(ctx context.Context) error {
 }
 
 func (s *Service) Opportunities() <-chan Opportunity {
-	return s.opportunities
-}
-
-func (s *Service) seedTicker(ctx context.Context) {
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case t := <-ticker.C:
-			s.opportunities <- Opportunity{
-				Chain:    s.cfg.Chain,
-				Type:     "dex-arb",
-				Payload:  map[string]any{"source": "stub"},
-				Observed: t,
-			}
-		}
-	}
+	return s.source.Opportunities()
 }

@@ -25,6 +25,7 @@
 | `MEV_MIN_PROFIT_USD` | 最小利润阈值 | `5.0` |
 | `MEV_MAX_GAS_GWEI` | 最大 Gas 上限 | `120` |
 | `MEV_RISK_LIMIT_USD` | 风险限额 | `5000` |
+| `MEV_OPPORTUNITY_FILE` | JSONL 机会数据文件（用于回放/测试） | 空 |
 
 ## 3. 构建与运行
 
@@ -44,6 +45,19 @@ MEV_RPC_URL=http://localhost:8545 \
 MEV_MIN_PROFIT_USD=5.0 \
 MEV_MAX_GAS_GWEI=120 \
 ./mevbot
+```
+
+### 3.3 机会回放（JSONL）
+
+准备 JSONL 文件（每行一个机会对象）：
+```json
+{"type":"dex-arb","payload":{"pair":"WETH/USDC","spread":"0.4%"}}
+{"type":"flashloan-arb","payload":{"asset":"USDC","amount":"500000"}}
+```
+
+运行：
+```bash
+MEV_OPPORTUNITY_FILE=./opportunities.jsonl ./mevbot
 ```
 
 ## 4. 部署建议
