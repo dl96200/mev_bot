@@ -15,6 +15,11 @@ type Transaction struct {
 	Data  string `json:"input"`
 }
 
+type TxPoolContent struct {
+	Pending map[string]map[string]Transaction `json:"pending"`
+	Queued  map[string]map[string]Transaction `json:"queued"`
+}
+
 type CallRequest struct {
 	From     string `json:"from,omitempty"`
 	To       string `json:"to,omitempty"`
@@ -35,6 +40,14 @@ type SendTransactionRequest struct {
 	MaxFeePerGas         string `json:"maxFeePerGas,omitempty"`
 	MaxPriorityFeePerGas string `json:"maxPriorityFeePerGas,omitempty"`
 	Nonce                string `json:"nonce,omitempty"`
+	Type                 string `json:"type,omitempty"`
+	ChainID              string `json:"chainId,omitempty"`
+}
+
+type SignedTransaction struct {
+	Raw  string `json:"raw"`
+	Tx   string `json:"tx"`
+	Hash string `json:"hash"`
 }
 
 type BundleItem struct {

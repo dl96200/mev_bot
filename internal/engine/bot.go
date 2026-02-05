@@ -25,21 +25,14 @@ type Bot struct {
 }
 
 func NewBot(cfg config.Config, market *marketdata.Service, exec *executor.Service, riskManager *risk.Manager, monitor *monitoring.Service, simulator *simulator.Service, strategies []strategy.Strategy) *Bot {
-	return &Bot{
-		cfg:        cfg,
-		market:     market,
-		executor:   exec,
-		risk:       riskManager,
-		monitor:    monitor,
-		simulator:  simulator,
-		strategies: strategies,
-	}
+	return &Bot{cfg: cfg, market: market, executor: exec, risk: riskManager, monitor: monitor, simulator: simulator, strategies: strategies}
 }
 
 func (b *Bot) Run(ctx context.Context) error {
 	if err := b.market.Start(ctx); err != nil {
 		return err
 	}
+	b.monitor.StartMetricsServer(ctx)
 
 	for {
 		select {
@@ -69,6 +62,7 @@ func (b *Bot) Run(ctx context.Context) error {
 					continue
 				}
 				plan.SimulationReason = simResult.Reason
+				plan.PriceImpactBps = simResult.PriceImpactBps
 				if simResult.EstimatedGas > 0 {
 					plan.GasLimit = simResult.EstimatedGas
 					plan.EstimatedGasUSD = estimateGasUSD(plan.GasLimit, b.cfg.MaxGasGwei)
@@ -104,6 +98,4 @@ func estimateGasUSD(gasLimit int64, maxGasGwei int64) float64 {
 	return float64(gasLimit) * float64(maxGasGwei) / 1_000_000_000
 }
 
-func IsTerminal(err error) bool {
-	return errors.Is(err, context.Canceled)
-}
+func IsTerminal(err error) bool { return errors.Is(err, context.Canceled) }

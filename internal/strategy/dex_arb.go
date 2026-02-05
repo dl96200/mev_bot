@@ -20,12 +20,9 @@ func (d *DexArb) Name() string {
 }
 
 func (d *DexArb) Evaluate(_ context.Context, opportunity marketdata.Opportunity) (*Plan, error) {
-	if opportunity.Type != "dex-arb" && opportunity.Type != "dex-pool" {
+	if opportunity.Type != "dex-pool" && opportunity.Type != "mempool-tx" {
 		return nil, nil
 	}
-
-	plan := buildPlan(d.cfg, d.Name(), d.cfg.MinProfitUSD+1, "quote path", "swap v2->v3")
-	plan.TargetAddress = "0x0000000000000000000000000000000000000000"
-	plan.Calldata = "0x"
+	plan := buildPlan(d.cfg, d.Name(), d.cfg.MinProfitUSD+1.2, "read pancake pool", "route bsc path", "submit arb")
 	return plan, nil
 }

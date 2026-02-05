@@ -1,8 +1,11 @@
 package monitoring
 
 import (
+	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"sync"
@@ -26,20 +29,17 @@ type Service struct {
 }
 
 type auditEntry struct {
-	Type      string          `json:"type"`
-	Timestamp time.Time       `json:"timestamp"`
-	Plan      *strategy.Plan  `json:"plan,omitempty"`
-	Error     string          `json:"error,omitempty"`
-	Payload   json.RawMessage `json:"payload,omitempty"`
+	Type      string         `json:"type"`
+	Timestamp time.Time      `json:"timestamp"`
+	Plan      *strategy.Plan `json:"plan,omitempty"`
+	Error     string         `json:"error,omitempty"`
 }
 
 func NewService(cfg config.Config) *Service {
 	service := &Service{
 		cfg:       cfg,
 		lastError: make(map[string]error),
-		http: &http.Client{
-			Timeout: 5 * time.Second,
-		},
+		http:      &http.Client{Timeout: 5 * time.Second},
 	}
 	if cfg.AuditLogPath != "" {
 		file, err := os.OpenFile(cfg.AuditLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
@@ -48,6 +48,28 @@ func NewService(cfg config.Config) *Service {
 		}
 	}
 	return service
+}
+
+func (s *Service) StartMetricsServer(ctx context.Context) {
+	if s.cfg.MetricsAddr == "" {
+		return
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/metrics", func(w http.ResponseWriter, _ *http.Request) {
+		snapshot := s.Snapshot()
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		_, _ = fmt.Fprintf(w, "mev_opportunities_total %v\n", snapshot["opportunities"])
+		_, _ = fmt.Fprintf(w, "mev_success_total %v\n", snapshot["successes"])
+		_, _ = fmt.Fprintf(w, "mev_rejections_total %v\n", snapshot["rejections"])
+		_, _ = fmt.Fprintf(w, "mev_failures_total %v\n", snapshot["failures"])
+	})
+
+	srv := &http.Server{Addr: s.cfg.MetricsAddr, Handler: mux}
+	go func() {
+		<-ctx.Done()
+		_ = srv.Shutdown(context.Background())
+	}()
+	go func() { _ = srv.ListenAndServe() }()
 }
 
 func (s *Service) TrackOpportunity(_ marketdata.Opportunity) {
@@ -95,7 +117,6 @@ func (s *Service) TrackExecution(plan *strategy.Plan, err error) {
 func (s *Service) Snapshot() map[string]any {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
 	return map[string]any{
 		"chain":         s.cfg.Chain,
 		"opportunities": s.opportunities,
@@ -106,19 +127,35 @@ func (s *Service) Snapshot() map[string]any {
 	}
 }
 
+func (s *Service) ReplayAudit(path string) ([]auditEntry, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var entries []auditEntry
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		var entry auditEntry
+		if err := json.Unmarshal(scanner.Bytes(), &entry); err == nil {
+			entries = append(entries, entry)
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return entries, nil
+}
+
 func (s *Service) emitAudit(typ string, plan *strategy.Plan, err error) {
 	if s.auditFile == nil {
 		return
 	}
-	entry := auditEntry{
-		Type:      typ,
-		Timestamp: time.Now().UTC(),
-		Plan:      plan,
-	}
+	entry := auditEntry{Type: typ, Timestamp: time.Now().UTC(), Plan: plan}
 	if err != nil {
 		entry.Error = err.Error()
 	}
-
 	data, marshalErr := json.Marshal(entry)
 	if marshalErr != nil {
 		return
@@ -127,15 +164,11 @@ func (s *Service) emitAudit(typ string, plan *strategy.Plan, err error) {
 }
 
 func (s *Service) sendAlert(source string, err error) {
-	payload := map[string]string{
-		"source":  source,
-		"message": err.Error(),
-	}
+	payload := map[string]string{"source": source, "message": err.Error()}
 	data, marshalErr := json.Marshal(payload)
 	if marshalErr != nil {
 		return
 	}
-
 	req, reqErr := http.NewRequest(http.MethodPost, s.cfg.AlertWebhookURL, bytes.NewReader(data))
 	if reqErr != nil {
 		return

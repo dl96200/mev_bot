@@ -2,7 +2,6 @@ package marketdata
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -21,7 +20,7 @@ func NewRPCSource(cfg config.Config, client *chain.Client) *RPCSource {
 	return &RPCSource{
 		cfg:           cfg,
 		client:        client,
-		opportunities: make(chan Opportunity, 128),
+		opportunities: make(chan Opportunity, 512),
 	}
 }
 
@@ -37,7 +36,7 @@ func (r *RPCSource) Opportunities() <-chan Opportunity {
 func (r *RPCSource) poll(ctx context.Context) {
 	interval := r.cfg.BlockPollInterval
 	if interval == 0 {
-		interval = 5 * time.Second
+		interval = 2 * time.Second
 	}
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -57,10 +56,19 @@ func (r *RPCSource) pollOnce(ctx context.Context) {
 	if err := r.client.Call(ctx, "eth_blockNumber", []interface{}{}, &blockNumber); err != nil {
 		return
 	}
-	if blockNumber == r.lastBlock {
-		return
+	if blockNumber != r.lastBlock {
+		r.pollBlock(ctx, blockNumber)
 	}
 
+	if r.cfg.EnableTxPool {
+		r.pollTxPool(ctx)
+	}
+
+	r.pollContracts(ctx, r.cfg.PoolCalls, "dex-pool")
+	r.pollContracts(ctx, r.cfg.OracleCalls, "oracle")
+}
+
+func (r *RPCSource) pollBlock(ctx context.Context, blockNumber string) {
 	var block chain.Block
 	if err := r.client.Call(ctx, "eth_getBlockByNumber", []interface{}{blockNumber, true}, &block); err != nil {
 		return
@@ -77,14 +85,29 @@ func (r *RPCSource) pollOnce(ctx context.Context) {
 	for _, tx := range block.Transactions {
 		r.opportunities <- Opportunity{
 			Chain:    r.cfg.Chain,
-			Type:     "mempool-tx",
+			Type:     "block-tx",
 			Payload:  map[string]any{"hash": tx.Hash, "from": tx.From, "to": tx.To, "value": tx.Value},
 			Observed: time.Now(),
 		}
 	}
+}
 
-	r.pollContracts(ctx, r.cfg.PoolCalls, "dex-pool")
-	r.pollContracts(ctx, r.cfg.OracleCalls, "oracle")
+func (r *RPCSource) pollTxPool(ctx context.Context) {
+	var txpool chain.TxPoolContent
+	if err := r.client.Call(ctx, "txpool_content", []interface{}{}, &txpool); err != nil {
+		return
+	}
+
+	for from, nonceMap := range txpool.Pending {
+		for nonce, tx := range nonceMap {
+			r.opportunities <- Opportunity{
+				Chain:    r.cfg.Chain,
+				Type:     "mempool-tx",
+				Payload:  map[string]any{"from": from, "nonce": nonce, "hash": tx.Hash, "to": tx.To, "value": tx.Value},
+				Observed: time.Now(),
+			}
+		}
+	}
 }
 
 func (r *RPCSource) pollContracts(ctx context.Context, calls []string, typ string) {
@@ -107,12 +130,4 @@ func (r *RPCSource) pollContracts(ctx context.Context, calls []string, typ strin
 			Observed: time.Now(),
 		}
 	}
-}
-
-func (r *RPCSource) Health(ctx context.Context) error {
-	var blockNumber string
-	if err := r.client.Call(ctx, "eth_blockNumber", []interface{}{}, &blockNumber); err != nil {
-		return fmt.Errorf("rpc health check failed: %w", err)
-	}
-	return nil
 }

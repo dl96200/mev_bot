@@ -25,6 +25,7 @@ type Plan struct {
 	TargetBlock      string
 	EstimatedGasUSD  float64
 	SimulationReason string
+	PriceImpactBps   int64
 }
 
 type Strategy interface {
@@ -41,7 +42,9 @@ func buildPlan(cfg config.Config, name string, pnl float64, actions ...string) *
 		Actions:         actions,
 		CreatedAt:       time.Now(),
 		GasLimit:        350000,
-		PriorityFeeGwei: 2,
+		PriorityFeeGwei: 1,
 		SlippageBps:     cfg.MaxSlippageBps,
+		TargetAddress:   "0x0000000000000000000000000000000000000000",
+		Calldata:        "0x",
 	}
 }

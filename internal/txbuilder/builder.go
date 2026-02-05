@@ -36,7 +36,20 @@ func (b *Builder) Build(plan *strategy.Plan) (*chain.SendTransactionRequest, err
 		Data:                 plan.Calldata,
 		MaxFeePerGas:         maxFee,
 		MaxPriorityFeePerGas: priorityFee,
+		Type:                 "0x2",
+		ChainID:              chainIDForChain(b.cfg.Chain),
 	}, nil
+}
+
+func chainIDForChain(chain string) string {
+	switch chain {
+	case "bsc":
+		return "0x38"
+	case "ethereum":
+		return "0x1"
+	default:
+		return "0x1"
+	}
 }
 
 func gweiToWei(gwei int64) string {
@@ -47,5 +60,8 @@ func gweiToWei(gwei int64) string {
 }
 
 func toHex(value int64) string {
+	if value <= 0 {
+		return "0x0"
+	}
 	return "0x" + strconv.FormatInt(value, 16)
 }

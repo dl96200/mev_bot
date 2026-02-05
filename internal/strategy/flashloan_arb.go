@@ -20,12 +20,9 @@ func (f *FlashLoanArb) Name() string {
 }
 
 func (f *FlashLoanArb) Evaluate(_ context.Context, opportunity marketdata.Opportunity) (*Plan, error) {
-	if opportunity.Type != "flashloan-arb" {
+	if opportunity.Type != "oracle" {
 		return nil, nil
 	}
-
-	plan := buildPlan(f.cfg, f.Name(), f.cfg.MinProfitUSD+2, "request flashloan", "execute swaps", "repay loan")
-	plan.TargetAddress = "0x0000000000000000000000000000000000000000"
-	plan.Calldata = "0x"
+	plan := buildPlan(f.cfg, f.Name(), f.cfg.MinProfitUSD+2.0, "borrow flashloan", "swap multi-hop", "repay + profit")
 	return plan, nil
 }

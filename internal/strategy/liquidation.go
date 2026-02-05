@@ -20,12 +20,9 @@ func (l *Liquidation) Name() string {
 }
 
 func (l *Liquidation) Evaluate(_ context.Context, opportunity marketdata.Opportunity) (*Plan, error) {
-	if opportunity.Type != "liquidation" {
+	if opportunity.Type != "block" {
 		return nil, nil
 	}
-
-	plan := buildPlan(l.cfg, l.Name(), l.cfg.MinProfitUSD+3, "fetch account", "repay debt", "seize collateral")
-	plan.TargetAddress = "0x0000000000000000000000000000000000000000"
-	plan.Calldata = "0x"
+	plan := buildPlan(l.cfg, l.Name(), l.cfg.MinProfitUSD+0.8, "scan hf", "liquidate account", "collect bonus")
 	return plan, nil
 }

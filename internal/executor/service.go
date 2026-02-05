@@ -50,10 +50,56 @@ func (s *Service) Execute(ctx context.Context, plan *strategy.Plan) (*chain.Send
 		return tx, nil
 	}
 
-	if err := s.client.Call(ctx, "eth_sendTransaction", []interface{}{tx}, nil); err != nil {
+	raw, err := s.signTransaction(ctx, tx)
+	if err != nil {
+		return tx, err
+	}
+	if err := s.sendWithRetry(ctx, raw, plan); err != nil {
 		return tx, err
 	}
 	return tx, nil
+}
+
+func (s *Service) signTransaction(ctx context.Context, tx *chain.SendTransactionRequest) (string, error) {
+	if tx == nil {
+		return "", fmt.Errorf("nil tx")
+	}
+	var signed chain.SignedTransaction
+	if err := s.client.Call(ctx, "eth_signTransaction", []interface{}{tx}, &signed); err != nil {
+		return "", fmt.Errorf("sign transaction failed: %w", err)
+	}
+	if signed.Raw == "" {
+		return "", fmt.Errorf("empty signed raw tx")
+	}
+	return signed.Raw, nil
+}
+
+func (s *Service) sendWithRetry(ctx context.Context, raw string, plan *strategy.Plan) error {
+	if raw == "" {
+		return fmt.Errorf("empty raw tx")
+	}
+
+	maxAttempts := 3
+	backoff := 500 * time.Millisecond
+	lastErr := error(nil)
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if err := s.client.Call(ctx, "eth_sendRawTransaction", []interface{}{raw}, nil); err == nil {
+			return nil
+		} else {
+			lastErr = err
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(backoff):
+		}
+		backoff *= 2
+		if plan != nil {
+			plan.PriorityFeeGwei++
+		}
+	}
+	return fmt.Errorf("send raw transaction failed after retries: %w", lastErr)
 }
 
 func (s *Service) SubmitBundle(ctx context.Context, signedTxs []string, targetBlock string) error {
@@ -63,17 +109,21 @@ func (s *Service) SubmitBundle(ctx context.Context, signedTxs []string, targetBl
 	if len(signedTxs) == 0 {
 		return fmt.Errorf("empty bundle")
 	}
+	if targetBlock == "" {
+		var latest string
+		if err := s.client.Call(ctx, "eth_blockNumber", []interface{}{}, &latest); err == nil {
+			targetBlock = latest
+		}
+	}
 
 	payload := chain.BundleRequest{
 		JSONRPC: "2.0",
 		ID:      1,
 		Method:  "eth_sendBundle",
-		Params: []chain.BundleItem{
-			{
-				Txs:         signedTxs,
-				BlockNumber: targetBlock,
-			},
-		},
+		Params: []chain.BundleItem{{
+			Txs:         signedTxs,
+			BlockNumber: targetBlock,
+		}},
 	}
 
 	body, err := json.Marshal(payload)
@@ -95,10 +145,8 @@ func (s *Service) SubmitBundle(ctx context.Context, signedTxs []string, targetBl
 		return fmt.Errorf("bundle request failed: %w", err)
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode >= 300 {
 		return fmt.Errorf("bundle rejected: %s", resp.Status)
 	}
-
 	return nil
 }

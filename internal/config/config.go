@@ -9,6 +9,7 @@ import (
 type Config struct {
 	Chain              string
 	RPCURL             string
+	WSURL              string
 	PrivateRelayURL    string
 	MinProfitUSD       float64
 	MaxGasGwei         int64
@@ -25,20 +26,23 @@ type Config struct {
 	AlertWebhookURL    string
 	MaxSlippageBps     int64
 	MaxGasUSD          float64
+	EnableTxPool       bool
+	MetricsAddr        string
 }
 
 func LoadFromEnv() Config {
 	return Config{
-		Chain:              getEnv("MEV_CHAIN", "ethereum"),
-		RPCURL:             getEnv("MEV_RPC_URL", "http://localhost:8545"),
+		Chain:              getEnv("MEV_CHAIN", "bsc"),
+		RPCURL:             getEnv("MEV_RPC_URL", "https://bsc-dataseed.binance.org"),
+		WSURL:              getEnv("MEV_WS_URL", ""),
 		PrivateRelayURL:    getEnv("MEV_PRIVATE_RELAY", ""),
 		MinProfitUSD:       getEnvFloat("MEV_MIN_PROFIT_USD", 5.0),
-		MaxGasGwei:         getEnvInt64("MEV_MAX_GAS_GWEI", 120),
+		MaxGasGwei:         getEnvInt64("MEV_MAX_GAS_GWEI", 5),
 		RiskLimitUSD:       getEnvFloat("MEV_RISK_LIMIT_USD", 5000),
-		FlashLoanProviders: []string{"aave-v3", "uniswap-v3"},
+		FlashLoanProviders: []string{"pancakeswap-v3", "aave-v3"},
 		OpportunityFile:    getEnv("MEV_OPPORTUNITY_FILE", ""),
-		MarketDataSource:   getEnv("MEV_MARKETDATA_SOURCE", "ticker"),
-		BlockPollInterval:  getEnvDuration("MEV_BLOCK_POLL_INTERVAL", 5*time.Second),
+		MarketDataSource:   getEnv("MEV_MARKETDATA_SOURCE", "rpc"),
+		BlockPollInterval:  getEnvDuration("MEV_BLOCK_POLL_INTERVAL", 2*time.Second),
 		PoolCalls:          getEnvCSV("MEV_POOL_CALLS"),
 		OracleCalls:        getEnvCSV("MEV_ORACLE_CALLS"),
 		FromAddress:        getEnv("MEV_FROM_ADDRESS", ""),
@@ -47,6 +51,8 @@ func LoadFromEnv() Config {
 		AlertWebhookURL:    getEnv("MEV_ALERT_WEBHOOK", ""),
 		MaxSlippageBps:     getEnvInt64("MEV_MAX_SLIPPAGE_BPS", 50),
 		MaxGasUSD:          getEnvFloat("MEV_MAX_GAS_USD", 50),
+		EnableTxPool:       getEnvBool("MEV_ENABLE_TXPOOL", true),
+		MetricsAddr:        getEnv("MEV_METRICS_ADDR", ":9090"),
 	}
 }
 
@@ -108,4 +114,12 @@ func getEnvCSV(key string) []string {
 		}
 	}
 	return cleaned
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	value := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+	if value == "" {
+		return fallback
+	}
+	return value == "1" || value == "true" || value == "yes" || value == "on"
 }
