@@ -14,6 +14,7 @@ import (
 	"mev_bot/internal/executor"
 	"mev_bot/internal/marketdata"
 	"mev_bot/internal/monitoring"
+	"mev_bot/internal/nonce"
 	"mev_bot/internal/risk"
 	"mev_bot/internal/simulator"
 	"mev_bot/internal/strategy"
@@ -33,9 +34,10 @@ func main() {
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
 	rpcClient := chain.NewClient(cfg.RPCURL)
+	nonceManager := nonce.NewManager(rpcClient)
 	md := marketdata.NewService(cfg, rpcClient)
 	builder := txbuilder.NewBuilder(cfg)
-	exec := executor.NewService(cfg, builder, rpcClient)
+	exec := executor.NewService(cfg, builder, rpcClient, nonceManager)
 	riskManager := risk.NewManager(cfg)
 	monitor := monitoring.NewService(cfg)
 	sim := simulator.NewService(cfg, rpcClient)

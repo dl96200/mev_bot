@@ -13,7 +13,7 @@
 | --- | --- | --- |
 | `MEV_CHAIN` | 链名称 | `bsc` |
 | `MEV_RPC_URL` | BSC RPC 地址 | `https://bsc-dataseed.binance.org` |
-| `MEV_WS_URL` | WebSocket 地址（预留） | 空 |
+| `MEV_WS_URL` | WebSocket 地址（后续可接入订阅） | 空 |
 | `MEV_MARKETDATA_SOURCE` | `rpc/file/ticker` | `rpc` |
 | `MEV_BLOCK_POLL_INTERVAL` | 区块轮询间隔 | `2s` |
 | `MEV_ENABLE_TXPOOL` | 是否解析 txpool mempool | `true` |
@@ -58,7 +58,7 @@ MEV_METRICS_ADDR=:9090 \
 
 ### 4.2 真实交易构建与发送
 - 构建 EIP-1559（type 0x2）交易参数
-- 公共通道：`eth_signTransaction` + `eth_sendRawTransaction`
+- 公共通道：`eth_signTransaction` + `eth_sendRawTransaction`（含 nonce 管理）
 - 私有通道：`eth_sendBundle` 提交
 
 ### 4.3 模拟与风控

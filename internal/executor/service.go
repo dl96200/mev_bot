@@ -10,22 +10,25 @@ import (
 
 	"mev_bot/internal/chain"
 	"mev_bot/internal/config"
+	"mev_bot/internal/nonce"
 	"mev_bot/internal/strategy"
 	"mev_bot/internal/txbuilder"
 )
 
 type Service struct {
-	cfg     config.Config
-	builder *txbuilder.Builder
-	client  *chain.Client
-	http    *http.Client
+	cfg          config.Config
+	builder      *txbuilder.Builder
+	client       *chain.Client
+	nonceManager *nonce.Manager
+	http         *http.Client
 }
 
-func NewService(cfg config.Config, builder *txbuilder.Builder, client *chain.Client) *Service {
+func NewService(cfg config.Config, builder *txbuilder.Builder, client *chain.Client, nonceManager *nonce.Manager) *Service {
 	return &Service{
-		cfg:     cfg,
-		builder: builder,
-		client:  client,
+		cfg:          cfg,
+		builder:      builder,
+		client:       client,
+		nonceManager: nonceManager,
 		http: &http.Client{
 			Timeout: 10 * time.Second,
 		},
@@ -42,6 +45,14 @@ func (s *Service) Execute(ctx context.Context, plan *strategy.Plan) (*chain.Send
 		return nil, err
 	}
 
+	if tx.Nonce == "" && s.nonceManager != nil {
+		nonceHex, nonceErr := s.nonceManager.Next(ctx, tx.From)
+		if nonceErr != nil {
+			return tx, nonceErr
+		}
+		tx.Nonce = nonceHex
+	}
+
 	if s.cfg.PrivateRelayURL != "" && len(plan.BundleTxs) > 0 {
 		err := s.SubmitBundle(ctx, plan.BundleTxs, plan.TargetBlock)
 		if err != nil {
@@ -56,6 +67,9 @@ func (s *Service) Execute(ctx context.Context, plan *strategy.Plan) (*chain.Send
 	}
 	if err := s.sendWithRetry(ctx, raw, plan); err != nil {
 		return tx, err
+	}
+	if s.nonceManager != nil {
+		s.nonceManager.MarkUsed(tx.From, tx.Nonce)
 	}
 	return tx, nil
 }
