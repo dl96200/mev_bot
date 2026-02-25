@@ -70,3 +70,7 @@ MEV_METRICS_ADDR=:9090 \
 - 内置 `/metrics`（Prometheus 文本格式）
 - webhook 告警
 - JSONL 审计日志与回放读取
+
+
+## 5. 生产部署
+- 详细部署步骤请参考 `docs/deployment-production.md`。

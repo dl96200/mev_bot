@@ -63,6 +63,10 @@ func (s *Service) StartMetricsServer(ctx context.Context) {
 		_, _ = fmt.Fprintf(w, "mev_rejections_total %v\n", snapshot["rejections"])
 		_, _ = fmt.Fprintf(w, "mev_failures_total %v\n", snapshot["failures"])
 	})
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
 
 	srv := &http.Server{Addr: s.cfg.MetricsAddr, Handler: mux}
 	go func() {

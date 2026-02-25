@@ -1,0 +1,38 @@
+version: '3.9'
+services:
+  mevbot:
+    image: golang:1.21
+    container_name: mevbot
+    working_dir: /app
+    command: bash -lc "go build -o /usr/local/bin/mevbot ./cmd/mevbot && /usr/local/bin/mevbot"
+    env_file:
+      - .env
+    volumes:
+      - ..:/app
+      - mevbot_data:/var/lib/mevbot
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mevbot-prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9091:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mevbot-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+volumes:
+  mevbot_data:
