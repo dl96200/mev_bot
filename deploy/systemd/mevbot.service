@@ -1,0 +1,23 @@
+[Unit]
+Description=MEV Bot (BSC)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mevbot
+Group=mevbot
+WorkingDirectory=/opt/mevbot
+EnvironmentFile=/opt/mevbot/.env
+ExecStart=/opt/mevbot/mevbot
+Restart=always
+RestartSec=2
+LimitNOFILE=65535
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mevbot
+
+[Install]
+WantedBy=multi-user.target
